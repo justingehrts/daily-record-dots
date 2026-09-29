@@ -55,7 +55,7 @@ The script can be run on demand or unattended on a schedule (using Windows Task 
 
 ## Adding missing stations (`station_manager.ps1`)
 
-When `missing_log.txt` lists stations, right-click `station_manager.ps1` and select 'Run with Powershell' to open the **Weather Station Manager** window:
+When `missing_log.txt` lists stations, right-click `station_manager.ps1` and select 'Run with PowerShell' to open the **Weather Station Manager** window:
 
 1. Pick an ID from the *Select Missing* drop-down (it is filled from `missing_log.txt`; you can also type any ID).
 2. Enter the station name, latitude and longitude.
@@ -71,7 +71,7 @@ Place the files on your Core 2 (TVDC-2) system. If you wish to follow this readm
 
 **On demand:**
 
-Right-click `FetchDailyRecords.ps1` and select `Run with PowerShell.`
+Right-click `FetchDailyRecords.ps1` and select `Run with PowerShell`.
 
 **Scheduled (Windows Task Scheduler):** create a task whose action is:
 
