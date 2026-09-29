@@ -79,7 +79,7 @@ Right-click 'FetchDailyRecords.ps1' and select 'Run with PowerShell.'
 
 - General tab: Name your script. Run whether the user is logged on or not, and do not store password. Run with highest privileges.
 - Triggers tab: Choose when you want it to run and how often. For example, you can have it run hourly, or you can have multiple time triggers for specific times each day. 
-- Actions tab: Start a program ( 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' ); arguments: '-ExecutionPolicy Bypass -File "C:\LOCAL\Scripts\daily-records\FetchDailyRecords.ps1" '; start in: `C:\LOCAL\Scripts\daily-records`
+- Actions tab: Start a program (`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`); arguments: `-ExecutionPolicy Bypass -File "C:\LOCAL\Scripts\daily-records\FetchDailyRecords.ps1"`; start in: `C:\LOCAL\Scripts\daily-records`
 - Settings tab: Allow to be run on demand, stop the task if it runs for longer than 1 hour, force it to stop if a running task does not end when requested
 
 ## Requirements and notes
