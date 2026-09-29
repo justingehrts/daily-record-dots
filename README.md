@@ -1,6 +1,6 @@
 # daily-record-dots
 
-Pulls the forecast **record and near-record temperature** lists from the National Digital Forecast Database (NDFD), as published on the NOAA Weather Prediction Center (WPC) website, and turns them into map-ready CSVs of station locations. One CSV is produced for every forecast day and record type.
+Pulls the forecast **record and near-record temperature** lists from the National Digital Forecast Database (NDFD), as published on the NOAA Weather Prediction Center (WPC) website, and turns them into map-ready CSVs of station locations. One CSV is produced for every forecast day and record type. You will need to assign a plot template for each day and record type, or you can import the zipped scene file which will contain the elements you need.
 
 The script can be run on demand or unattended on a schedule (using Windows Task Scheduler on Core 2).
 
@@ -65,7 +65,7 @@ Newly added stations are picked up on the next run of `FetchDailyRecords.ps1`.
 
 ## Max integration
 
-Place the files on your Core 2 (TVDC-2) system. If you wish to follow this readme explicitly, place them in _C:\LOCAL\Scripts\daily-records_
+Place the files on your Core 2 (TVDC-2) system. If you wish to follow this readme explicitly, place them in `C:\LOCAL\Scripts\daily-records`
 
 ## Running it
 
@@ -81,6 +81,16 @@ Right-click `FetchDailyRecords.ps1` and select `Run with PowerShell.`
 - Triggers tab: Choose when you want it to run and how often. For example, you can have it run hourly, or you can have multiple time triggers for specific times each day. 
 - Actions tab: Start a program (`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`); arguments: `-ExecutionPolicy Bypass -File "C:\LOCAL\Scripts\daily-records\FetchDailyRecords.ps1"`; start in: `C:\LOCAL\Scripts\daily-records`
 - Settings tab: Allow to be run on demand, stop the task if it runs for longer than 1 hour, force it to stop if a running task does not end when requested
+
+## Updating the layer in Max
+
+**Important!** While this script automatically updates the sites, _you must still manually update the scene in Max._
+
+1. In your scene, select the layer with the day/record type you want to update.
+2. In the Properties tab, go to the Plot Locations section and click the edit pencil.
+3. Select all the locations on the _right-hand side_ of the dialog box and click the left-facing arrow to remove them.
+4. On the _left-hand side_ of the dialog box, select all the locations and click the right-facing arrow.
+5. Click OK.
 
 ## Requirements and notes
 
