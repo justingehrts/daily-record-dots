@@ -2,7 +2,7 @@
 
 Pulls the forecast **record and near-record temperature** lists from the National Digital Forecast Database (NDFD), as published on the NOAA Weather Prediction Center (WPC) website, and turns them into map-ready CSVs of station locations. One CSV is produced for every forecast day and record type.
 
-The script runs unattended on a schedule (Windows Task Scheduler) and can also be run on demand.
+The script can be run on demand or unattended on a schedule (using Windows Task Scheduler on Core 2).
 
 ## Files
 
@@ -55,13 +55,17 @@ The script runs unattended on a schedule (Windows Task Scheduler) and can also b
 
 ## Adding missing stations (`station_manager.ps1`)
 
-When `missing_log.txt` lists stations, run `station_manager.ps1` to open the **Weather Station Manager** window:
+When `missing_log.txt` lists stations, right-click `station_manager.ps1` and select 'Run with Powershell' to open the **Weather Station Manager** window:
 
 1. Pick an ID from the *Select Missing* drop-down (it is filled from `missing_log.txt`; you can also type any ID).
 2. Enter the station name, latitude and longitude.
 3. Click **Save Station**. The station is appended to `stations.csv` (commas are stripped from the name so the CSV stays valid) and removed from the drop-down.
 
 Newly added stations are picked up on the next run of `FetchDailyRecords.ps1`.
+
+## Max integration
+
+Place the files on your Core 2 (TVDC-2) system. If you wish to follow this readme explicitly, place them in _C:\LOCAL\Scripts\daily-records_
 
 ## Running it
 
@@ -81,9 +85,6 @@ powershell.exe -ExecutionPolicy Bypass -File "C:\LOCAL\Scripts\daily-records\Fet
 
 <!-- TODO: add your actual trigger times / account / "run whether user is logged on" settings. -->
 
-## Max integration
-
-<!-- TODO: describe the Max side — where the exports\ CSVs are picked up, how they are used to draw the dots, and what needs to be done when stations are added. -->
 
 ## Requirements and notes
 
