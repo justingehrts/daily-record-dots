@@ -1,6 +1,6 @@
 # daily-record-dots
 
-Pulls the forecast **record and near-record temperature** lists from the National Digital Forecast Database (NDFD), as published on the NOAA Weather Prediction Center (WPC) website, and turns them into map-ready CSVs of station locations. One CSV is produced for every forecast day and record type. You will need to assign a plot template for each day and record type, or you can import the zipped scene file which will contain the elements you need.
+Pulls the forecast **record and near-record temperature** lists from the National Digital Forecast Database (NDFD), as published on the NOAA Weather Prediction Center (WPC) website, and turns them into map-ready CSVs of station locations. One CSV is produced for every forecast day and record type. If you don't want to build all the pieces from scratch, you can download the `Record Dots Base` scene from the WBNS Shared locker on Max Cloud.
 
 The script can be run on demand or unattended on a schedule (using Windows Task Scheduler on Core 2).
 
@@ -68,8 +68,6 @@ Newly added stations are picked up on the next run of `FetchDailyRecords.ps1`.
 Place the files on your Core 2 (TVDC-2) system. If you wish to follow this readme explicitly, place them in `C:\LOCAL\Scripts\daily-records`
 
 ## Running it
-
-Both scripts locate their files relative to the script's own folder. If run interactively (where `$PSScriptRoot` is empty) they fall back to `C:\LOCAL\Scripts\daily-records`.
 
 **On demand:**
 
