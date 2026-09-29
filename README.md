@@ -87,10 +87,10 @@ Right-click `FetchDailyRecords.ps1` and select `Run with PowerShell.`
 **Important!** While this script automatically updates the sites, _you must still manually update the scene in Max._
 
 1. In your scene, select the layer with the day/record type you want to update.
-2. In the Properties tab, go to the Plot Locations section and click the edit pencil.
-3. Select all the locations on the _right-hand side_ of the dialog box and click the left-facing arrow to remove them.
-4. On the _left-hand side_ of the dialog box, select all the locations and click the right-facing arrow.
-5. Click OK.
+2. In the Properties tab, go to the Plot Locations section and click the **edit pencil**.
+3. Select all the locations on the _right-hand side_ of the dialog box and click the **left-facing arrow** to remove them.
+4. On the _left-hand side_ of the dialog box, select all the locations and click the **right-facing arrow**.
+5. Click **OK**.
 
 ## Requirements and notes
 
