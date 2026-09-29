@@ -73,7 +73,7 @@ Both scripts locate their files relative to the script's own folder. If run inte
 
 **On demand:**
 
-Right-click 'FetchDailyRecords.ps1' and select 'Run with PowerShell.'
+Right-click `FetchDailyRecords.ps1` and select `Run with PowerShell.`
 
 **Scheduled (Windows Task Scheduler):** create a task whose action is:
 
