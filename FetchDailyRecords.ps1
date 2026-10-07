@@ -11,6 +11,7 @@ if (-not $scriptDir) { $scriptDir = "C:\LOCAL\Scripts\daily-records" } # Fallbac
 $stationFile   = Join-Path $scriptDir "stations.csv"
 $exportFolder  = Join-Path $scriptDir "exports"
 $missingLog    = Join-Path $scriptDir "missing_log.txt"
+$kmlFolder     = "D:\WSI\DigitalMedia\Custom\KML" # Max reads KML files from here
 
 # Create exports folder if it doesn't exist
 if (-not (Test-Path $exportFolder)) { New-Item -ItemType Directory -Path $exportFolder | Out-Null }
@@ -165,6 +166,37 @@ foreach ($day in $days) {
 
         Set-Content -Path $fileName -Value $csvText -Encoding UTF8 -Force
         (Get-Item $fileName).LastWriteTime = Get-Date
+
+        # --- KML EXPORT (for Max) ---
+        # Failure here (e.g. drive unavailable) must never stop the CSV export or the rest of the run
+        try {
+            if (-not (Test-Path $kmlFolder)) { New-Item -ItemType Directory -Path $kmlFolder -Force -ErrorAction Stop | Out-Null }
+
+            $label    = "{0} {1}" -f $day.ToUpper(), $type.ToUpper()
+            $stamp    = Get-Date -Format "yyyy-MM-dd HH:mm"
+            $kml      = [System.Text.StringBuilder]::new()
+            [void]$kml.AppendLine('<?xml version="1.0" encoding="UTF-8"?>')
+            [void]$kml.AppendLine('<kml xmlns="http://www.opengis.net/kml/2.2">')
+            [void]$kml.AppendLine('<Document>')
+            [void]$kml.AppendLine("<name>$label</name>")
+            foreach ($item in $results) {
+                $pmName = [System.Security.SecurityElement]::Escape($item.LOCATIONID)
+                $pmDesc = [System.Security.SecurityElement]::Escape(("{0} - {1} (updated {2})" -f $item.LOCATIONNAME, $label, $stamp))
+                # KML coordinate order is lon,lat
+                $coords = "{0},{1},0" -f $item.LONGITUDE, $item.LATITUDE
+                [void]$kml.AppendLine("<Placemark><name>$pmName</name><description>$pmDesc</description><Point><coordinates>$coords</coordinates></Point></Placemark>")
+            }
+            [void]$kml.AppendLine('</Document>')
+            [void]$kml.AppendLine('</kml>')
+
+            # Write to a temp file then rename, so Max never reads a half-written file
+            $kmlFile = Join-Path $kmlFolder ("{0}_{1}.kml" -f $day.ToUpper(), $type.ToUpper())
+            $kmlTmp  = "$kmlFile.tmp"
+            [System.IO.File]::WriteAllText($kmlTmp, $kml.ToString(), (New-Object System.Text.UTF8Encoding($false)))
+            Move-Item -Path $kmlTmp -Destination $kmlFile -Force -ErrorAction Stop
+        } catch {
+            # Leave any existing KML in place and carry on
+        }
     }
 }
 

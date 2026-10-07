@@ -1,6 +1,6 @@
 # daily-record-dots
 
-Pulls the forecast **record and near-record temperature** lists from the National Digital Forecast Database (NDFD), as published on the NOAA Weather Prediction Center (WPC) website, and turns them into map-ready CSVs of station locations. One CSV is produced for every forecast day and record type. If you don't want to build all the pieces from scratch, you can download the `Record Dots Base` scene from the WBNS Shared locker on Max Cloud.
+Pulls the forecast **record and near-record temperature** lists from the National Digital Forecast Database (NDFD), as published on the NOAA Weather Prediction Center (WPC) website, and turns them into map-ready CSVs and KML files of station locations. One CSV and one KML file are produced for every forecast day and record type. If you don't want to build all the pieces from scratch, you can download the `Record Dots Base` scene from the WBNS Shared locker on Max Cloud.
 
 The script can be run on demand or unattended on a schedule (using Windows Task Scheduler on Core 2).
 
@@ -8,11 +8,12 @@ The script can be run on demand or unattended on a schedule (using Windows Task 
 
 | File | Purpose |
 | --- | --- |
-| `FetchDailyRecords.ps1` | The main engine. Downloads the WPC lists, looks up each station's lat/lon, and writes the CSVs. |
+| `FetchDailyRecords.ps1` | The main engine. Downloads the WPC lists, looks up each station's lat/lon, and writes the CSVs and KML files. |
 | `station_manager.ps1` | Small on-demand WPF form for manually adding stations the script couldn't find. |
 | `stations.csv` | Station lookup: `LOCATIONID,LOCATIONNAME,LATITUDE,LONGITUDE` (one station per line, no header row needed). Grows automatically as stations are auto-learned. |
 | `missing_log.txt` | Written by the script: station IDs that could not be resolved. Read by `station_manager.ps1`. Deleted when nothing is missing. |
 | `exports\` | Created by the script. Holds the output CSVs. |
+| `D:\WSI\DigitalMedia\Custom\KML\` | Where the script writes the KML files for Max (set by `$kmlFolder` at the top of `FetchDailyRecords.ps1`). |
 
 ## How `FetchDailyRecords.ps1` works
 
@@ -50,6 +51,8 @@ The script can be run on demand or unattended on a schedule (using Windows Task 
    ```
 
    Existing files are overwritten on every run, and their timestamp is set to the time of the run.
+
+   **Also write one KML file per day/type** to `D:\WSI\DigitalMedia\Custom\KML\`, with the same names (`D1_HIMAX.kml`, ..., `D7_LOMIN.kml`). Each has one placemark per matched station (ID as the name, station name and update time in the description). Each file is written to a temporary file and then renamed, so Max never sees a half-written file. If the KML folder can't be written to, the CSVs and the rest of the run are unaffected.
 
 6. **Write the missing log.** All unresolved IDs (de-duplicated across all 28 files) are written to `missing_log.txt`, one per line. If nothing is missing, any old log is deleted.
 
