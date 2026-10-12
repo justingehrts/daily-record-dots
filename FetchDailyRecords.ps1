@@ -11,10 +11,14 @@ if (-not $scriptDir) { $scriptDir = "C:\LOCAL\Scripts\daily-records" } # Fallbac
 $stationFile   = Join-Path $scriptDir "stations.csv"
 $exportFolder  = Join-Path $scriptDir "exports"
 $missingLog    = Join-Path $scriptDir "missing_log.txt"
-$kmlFolder     = "D:\WSI\DigitalMedia\Custom\KML" # Max reads KML files from here
+$kmlFolder     = "D:\WSI\DigitalMedia\Custom\KML" # Max reads KML/KMZ files from here
+$iconFolder    = Join-Path $scriptDir "icons"          # himax.png, himin.png, lomax.png, lomin.png
 
 # Create exports folder if it doesn't exist
 if (-not (Test-Path $exportFolder)) { New-Item -ItemType Directory -Path $exportFolder | Out-Null }
+
+# Needed to build KMZ (zip) files
+Add-Type -AssemblyName System.IO.Compression
 
 # Enable TLS 1.2 for modern NWS API compatibility
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -167,35 +171,66 @@ foreach ($day in $days) {
         Set-Content -Path $fileName -Value $csvText -Encoding UTF8 -Force
         (Get-Item $fileName).LastWriteTime = Get-Date
 
-        # --- KML EXPORT (for Max) ---
+        # --- KMZ EXPORT (for Max) ---
         # Failure here (e.g. drive unavailable) must never stop the CSV export or the rest of the run
         try {
             if (-not (Test-Path $kmlFolder)) { New-Item -ItemType Directory -Path $kmlFolder -Force -ErrorAction Stop | Out-Null }
 
             $label    = "{0} {1}" -f $day.ToUpper(), $type.ToUpper()
             $stamp    = Get-Date -Format "yyyy-MM-dd HH:mm"
+            $iconFile = Join-Path $iconFolder "$type.png"
+            $hasIcon  = Test-Path $iconFile
+
             $kml      = [System.Text.StringBuilder]::new()
             [void]$kml.AppendLine('<?xml version="1.0" encoding="UTF-8"?>')
             [void]$kml.AppendLine('<kml xmlns="http://www.opengis.net/kml/2.2">')
             [void]$kml.AppendLine('<Document>')
             [void]$kml.AppendLine("<name>$label</name>")
+            if ($hasIcon) {
+                # Icon is bundled inside the KMZ, so the file is self-contained
+                [void]$kml.AppendLine("<Style id=`"dot`"><IconStyle><Icon><href>icons/$type.png</href></Icon></IconStyle></Style>")
+            }
             foreach ($item in $results) {
                 $pmName = [System.Security.SecurityElement]::Escape($item.LOCATIONID)
                 $pmDesc = [System.Security.SecurityElement]::Escape(("{0} - {1} (updated {2})" -f $item.LOCATIONNAME, $label, $stamp))
                 # KML coordinate order is lon,lat
                 $coords = "{0},{1},0" -f $item.LONGITUDE, $item.LATITUDE
-                [void]$kml.AppendLine("<Placemark><name>$pmName</name><description>$pmDesc</description><Point><coordinates>$coords</coordinates></Point></Placemark>")
+                $styleRef = if ($hasIcon) { "<styleUrl>#dot</styleUrl>" } else { "" }
+                [void]$kml.AppendLine("<Placemark><name>$pmName</name><description>$pmDesc</description>$styleRef<Point><coordinates>$coords</coordinates></Point></Placemark>")
             }
             [void]$kml.AppendLine('</Document>')
             [void]$kml.AppendLine('</kml>')
 
             # Write to a temp file then rename, so Max never reads a half-written file
-            $kmlFile = Join-Path $kmlFolder ("{0}_{1}.kml" -f $day.ToUpper(), $type.ToUpper())
-            $kmlTmp  = "$kmlFile.tmp"
-            [System.IO.File]::WriteAllText($kmlTmp, $kml.ToString(), (New-Object System.Text.UTF8Encoding($false)))
-            Move-Item -Path $kmlTmp -Destination $kmlFile -Force -ErrorAction Stop
+            $kmzFile = Join-Path $kmlFolder ("{0}_{1}.kmz" -f $day.ToUpper(), $type.ToUpper())
+            $kmzTmp  = "$kmzFile.tmp"
+            $fs  = [System.IO.File]::Open($kmzTmp, [System.IO.FileMode]::Create)
+            $zip = New-Object System.IO.Compression.ZipArchive($fs, [System.IO.Compression.ZipArchiveMode]::Create)
+            try {
+                $entry  = $zip.CreateEntry("doc.kml")
+                $stream = $entry.Open()
+                $bytes  = (New-Object System.Text.UTF8Encoding($false)).GetBytes($kml.ToString())
+                $stream.Write($bytes, 0, $bytes.Length)
+                $stream.Dispose()
+
+                if ($hasIcon) {
+                    $entry  = $zip.CreateEntry("icons/$type.png")
+                    $stream = $entry.Open()
+                    $bytes  = [System.IO.File]::ReadAllBytes($iconFile)
+                    $stream.Write($bytes, 0, $bytes.Length)
+                    $stream.Dispose()
+                }
+            } finally {
+                $zip.Dispose()
+                $fs.Dispose()
+            }
+            Move-Item -Path $kmzTmp -Destination $kmzFile -Force -ErrorAction Stop
+
+            # Remove a plain .kml of the same name left by an earlier version, so Max doesn't see duplicates
+            $oldKml = [System.IO.Path]::ChangeExtension($kmzFile, ".kml")
+            if (Test-Path $oldKml) { Remove-Item -Path $oldKml -Force -ErrorAction SilentlyContinue }
         } catch {
-            # Leave any existing KML in place and carry on
+            # Leave any existing KMZ in place and carry on
         }
     }
 }
