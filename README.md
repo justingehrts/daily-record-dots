@@ -12,6 +12,7 @@ The script can be run on demand or unattended on a schedule (using Windows Task 
 | `station_manager.ps1` | Small on-demand WPF form for manually adding stations the script couldn't find. |
 | `stations.csv` | Station lookup: `LOCATIONID,LOCATIONNAME,LATITUDE,LONGITUDE` (one station per line, no header row needed). Grows automatically as stations are auto-learned. |
 | `missing_log.txt` | Written by the script: station IDs that could not be resolved. Read by `station_manager.ps1`. Deleted when nothing is missing. |
+| `kml_error.log` | Written by the script only if a KMZ couldn't be created; lists the error for each file. Recreated on every run. |
 | `exports\` | Created by the script. Holds the output CSVs. |
 | `icons\` | The four dot icons (`himax.png`, `himin.png`, `lomax.png`, `lomin.png`) that the script bundles into each KMZ. Keep this folder next to the script. |
 | `D:\WSI\DigitalMedia\Custom\KML\` | Where the script writes the KMZ files for Max (set by `$kmlFolder` at the top of `FetchDailyRecords.ps1`). |

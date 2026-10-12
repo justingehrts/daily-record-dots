@@ -11,8 +11,12 @@ if (-not $scriptDir) { $scriptDir = "C:\LOCAL\Scripts\daily-records" } # Fallbac
 $stationFile   = Join-Path $scriptDir "stations.csv"
 $exportFolder  = Join-Path $scriptDir "exports"
 $missingLog    = Join-Path $scriptDir "missing_log.txt"
+$kmlErrorLog   = Join-Path $scriptDir "kml_error.log"
 $kmlFolder     = "D:\WSI\DigitalMedia\Custom\KML" # Max reads KML/KMZ files from here
 $iconFolder    = Join-Path $scriptDir "icons"          # himax.png, himin.png, lomax.png, lomin.png
+
+# Start each run with a fresh KMZ error log
+if (Test-Path $kmlErrorLog) { Remove-Item -Path $kmlErrorLog -Force -ErrorAction SilentlyContinue }
 
 # Create exports folder if it doesn't exist
 if (-not (Test-Path $exportFolder)) { New-Item -ItemType Directory -Path $exportFolder | Out-Null }
@@ -230,7 +234,10 @@ foreach ($day in $days) {
             $oldKml = [System.IO.Path]::ChangeExtension($kmzFile, ".kml")
             if (Test-Path $oldKml) { Remove-Item -Path $oldKml -Force -ErrorAction SilentlyContinue }
         } catch {
-            # Leave any existing KMZ in place and carry on
+            # Leave any existing KMZ in place and carry on, but record why it failed
+            $msg = "{0}  {1}_{2}: {3}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $day.ToUpper(), $type.ToUpper(), $_.Exception.Message
+            Write-Warning "KMZ export failed - $msg"
+            try { Add-Content -Path $kmlErrorLog -Value $msg } catch { }
         }
     }
 }
