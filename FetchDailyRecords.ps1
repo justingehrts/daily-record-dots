@@ -12,11 +12,23 @@ $stationFile   = Join-Path $scriptDir "stations.csv"
 $exportFolder  = Join-Path $scriptDir "exports"
 $missingLog    = Join-Path $scriptDir "missing_log.txt"
 $kmlErrorLog   = Join-Path $scriptDir "kml_error.log"
+$runLog        = Join-Path $scriptDir "run_log.txt"
 $kmlFolder     = "D:\WSI\DigitalMedia\Custom\KML" # Max reads KML/KMZ files from here
 $iconFolder    = Join-Path $scriptDir "icons"          # himax.png, himin.png, lomax.png, lomin.png
 
-# Start each run with a fresh KMZ error log
+# Start each run with fresh logs
 if (Test-Path $kmlErrorLog) { Remove-Item -Path $kmlErrorLog -Force -ErrorAction SilentlyContinue }
+if (Test-Path $runLog)      { Remove-Item -Path $runLog -Force -ErrorAction SilentlyContinue }
+
+# Writes a line to the console and to run_log.txt (never throws)
+function Write-RunLog {
+    param([string]$Message)
+    $line = "{0}  {1}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Message
+    Write-Host $line
+    try { Add-Content -Path $runLog -Value $line } catch { }
+}
+Write-RunLog "Starting. PowerShell $($PSVersionTable.PSVersion); script dir: $scriptDir"
+Write-RunLog "Stations file exists: $(Test-Path $stationFile); KML folder exists: $(Test-Path $kmlFolder); icons folder exists: $(Test-Path $iconFolder)"
 
 # Create exports folder if it doesn't exist
 if (-not (Test-Path $exportFolder)) { New-Item -ItemType Directory -Path $exportFolder | Out-Null }
@@ -30,11 +42,13 @@ Add-Type -AssemblyName System.IO.Compression
 # --- 1. LOAD STATION DATABASE ---
 $stationMap = @{}
 if (Test-Path $stationFile) {
-    Import-Csv -Path $stationFile | ForEach-Object {
+    # Explicit -Header so the first station row is never mistaken for column names
+    # (stations.csv has no header row; a header row, if present, is skipped below)
+    Import-Csv -Path $stationFile -Header LOCATIONID,LOCATIONNAME,LATITUDE,LONGITUDE | ForEach-Object {
         # Cast to [string] first to safely handle blank rows in the CSV
         $rawId = [string]$_.LOCATIONID
-        
-        if (-not [string]::IsNullOrWhiteSpace($rawId)) {
+
+        if (-not [string]::IsNullOrWhiteSpace($rawId) -and $rawId.Trim().ToUpper() -ne "LOCATIONID") {
             $code = $rawId.Trim().ToUpper()
             
             if ($code -and -not [double]::TryParse($code, [ref]$null)) {
@@ -97,6 +111,9 @@ $days     = @("d1", "d2", "d3", "d4", "d5", "d6", "d7")
 $types    = @("himax", "lomax", "himin", "lomin")
 $baseUrl  = "https://www.wpc.ncep.noaa.gov/exper/ndfd/"
 $allMissing = [System.Collections.Generic.HashSet[string]]::new()
+$failedDownloads = 0
+$csvCount = 0
+$kmzCount = 0
 
 foreach ($day in $days) {
     foreach ($type in $types) {
@@ -108,10 +125,16 @@ foreach ($day in $days) {
         try {
             $rawText = Invoke-RestMethod -Uri $noaaUrl -UserAgent "Mozilla/5.0" -TimeoutSec 10 -ErrorAction Stop
         } catch {
+            Write-RunLog "DOWNLOAD FAILED $day.$type : $($_.Exception.Message)"
+            $failedDownloads++
             continue
         }
 
-        if (-not $rawText -or $rawText.Length -lt 10) { continue }
+        if (-not $rawText -or $rawText.Length -lt 10) {
+            Write-RunLog "SKIPPED $day.$type : response empty or too short"
+            $failedDownloads++
+            continue
+        }
 
         $lines     = $rawText -split "`n"
         $results   = [System.Collections.Generic.List[psobject]]::new()
@@ -174,6 +197,7 @@ foreach ($day in $days) {
 
         Set-Content -Path $fileName -Value $csvText -Encoding UTF8 -Force
         (Get-Item $fileName).LastWriteTime = Get-Date
+        $csvCount++
 
         # --- KMZ EXPORT (for Max) ---
         # Failure here (e.g. drive unavailable) must never stop the CSV export or the rest of the run
@@ -229,6 +253,7 @@ foreach ($day in $days) {
                 $fs.Dispose()
             }
             Move-Item -Path $kmzTmp -Destination $kmzFile -Force -ErrorAction Stop
+            $kmzCount++
 
             # Remove a plain .kml of the same name left by an earlier version, so Max doesn't see duplicates
             $oldKml = [System.IO.Path]::ChangeExtension($kmzFile, ".kml")
@@ -236,7 +261,7 @@ foreach ($day in $days) {
         } catch {
             # Leave any existing KMZ in place and carry on, but record why it failed
             $msg = "{0}  {1}_{2}: {3}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $day.ToUpper(), $type.ToUpper(), $_.Exception.Message
-            Write-Warning "KMZ export failed - $msg"
+            Write-RunLog "KMZ FAILED $msg"
             try { Add-Content -Path $kmlErrorLog -Value $msg } catch { }
         }
     }
@@ -248,3 +273,5 @@ if ($allMissing.Count -gt 0) {
 } else {
     if (Test-Path $missingLog) { Remove-Item -Path $missingLog -Force }
 }
+
+Write-RunLog "Done. Downloads failed/skipped: $failedDownloads of 28; CSVs written: $csvCount; KMZs written: $kmzCount; missing station IDs: $($allMissing.Count)"

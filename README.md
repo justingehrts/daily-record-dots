@@ -10,8 +10,9 @@ The script can be run on demand or unattended on a schedule (using Windows Task 
 | --- | --- |
 | `FetchDailyRecords.ps1` | The main engine. Downloads the WPC lists, looks up each station's lat/lon, and writes the CSVs and KMZ files. |
 | `station_manager.ps1` | Small on-demand WPF form for manually adding stations the script couldn't find. |
-| `stations.csv` | Station lookup: `LOCATIONID,LOCATIONNAME,LATITUDE,LONGITUDE` (one station per line, no header row needed). Grows automatically as stations are auto-learned. |
+| `stations.csv` | Station lookup: `LOCATIONID,LOCATIONNAME,LATITUDE,LONGITUDE` (one station per line; a header row is optional and ignored). Grows automatically as stations are auto-learned. |
 | `missing_log.txt` | Written by the script: station IDs that could not be resolved. Read by `station_manager.ps1`. Deleted when nothing is missing. |
+| `run_log.txt` | Written by the script on every run: PowerShell version, folders, each failed download, and totals (CSVs/KMZs written, missing IDs). Look here first if nothing is being written. |
 | `kml_error.log` | Written by the script only if a KMZ couldn't be created; lists the error for each file. Recreated on every run. |
 | `exports\` | Created by the script. Holds the output CSVs. |
 | `icons\` | The four dot icons (`himax.png`, `himin.png`, `lomax.png`, `lomin.png`) that the script bundles into each KMZ. Keep this folder next to the script. |
@@ -102,3 +103,9 @@ Right-click `FetchDailyRecords.ps1` and select `Run with PowerShell`.
 - The script forces TLS 1.2 for the NWS API.
 - NWS API requests identify themselves with a contact address in the `-UserAgent` string in `Learn-Station`; keep this current, as NWS may use it to contact you about heavy use.
 - Because `stations.csv` is appended to automatically, it will grow over time. Names have commas stripped so they don't break the CSV.
+
+## Troubleshooting
+
+- Run the script from an open PowerShell window (not right-click) so the output stays on screen, then read `run_log.txt`.
+- `DOWNLOAD FAILED` lines mean the WPC files couldn't be fetched from that machine (network, proxy or firewall). Nothing is written for a file that fails to download, so the previous CSV/KMZ stays in place.
+- `KMZ FAILED` lines (also in `kml_error.log`) mean the CSV was written but the KMZ couldn't be, e.g. the KML folder isn't writable.
