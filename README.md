@@ -1,6 +1,6 @@
 # daily-record-dots
 
-Pulls the forecast **record and near-record temperature** lists from the National Digital Forecast Database (NDFD), as published on the NOAA Weather Prediction Center (WPC) website, and turns them into map-ready CSVs of station locations. One CSV is produced for every forecast day and record type. If you don't want to build all the pieces from scratch, you can download the `Record Dots Base` scene from the WBNS Shared locker on Max Cloud.
+Pulls the forecast **record and near-record temperature** lists from the National Digital Forecast Database (NDFD), as published on the NOAA Weather Prediction Center (WPC) website, and turns them into map-ready CSVs and KMZ files of station locations. One CSV and one KMZ file are produced for every forecast day and record type. If you don't want to build all the pieces from scratch, you can download the `Record Dots Base` scene from the WBNS Shared locker on Max Cloud.
 
 The script can be run on demand or unattended on a schedule (using Windows Task Scheduler on Core 2).
 
@@ -8,11 +8,16 @@ The script can be run on demand or unattended on a schedule (using Windows Task 
 
 | File | Purpose |
 | --- | --- |
-| `FetchDailyRecords.ps1` | The main engine. Downloads the WPC lists, looks up each station's lat/lon, and writes the CSVs. |
+| `FetchDailyRecords.ps1` | The main engine. Downloads the WPC lists, looks up each station's lat/lon, and writes the CSVs and KMZ files. |
 | `station_manager.ps1` | Small on-demand WPF form for manually adding stations the script couldn't find. |
-| `stations.csv` | Station lookup: `LOCATIONID,LOCATIONNAME,LATITUDE,LONGITUDE` (one station per line, no header row needed). Grows automatically as stations are auto-learned. |
+| `stations.csv` | Station lookup: `LOCATIONID,LOCATIONNAME,LATITUDE,LONGITUDE` (one station per line; a header row is optional and ignored). Grows automatically as stations are auto-learned. |
 | `missing_log.txt` | Written by the script: station IDs that could not be resolved. Read by `station_manager.ps1`. Deleted when nothing is missing. |
+| `run_log.txt` | Written by the script on every run: PowerShell version, folders, each failed download, and totals (CSVs/KMZs written, missing IDs). Look here first if nothing is being written. |
+| `kml_error.log` | Written by the script only if a KMZ couldn't be created; lists the error for each file. Recreated on every run. |
 | `exports\` | Created by the script. Holds the output CSVs. |
+| `icons\` | The four dot icons (`himax.png`, `himin.png`, `lomax.png`, `lomin.png`) that the script bundles into each KMZ. Keep this folder next to the script. |
+| `D:\WSI\DigitalMedia\Custom\NavImportedData\` | A copy of each CSV is also written here for Max (set by `$navDataFolder` at the top of `FetchDailyRecords.ps1`). |
+| `D:\WSI\DigitalMedia\Custom\KML\record-dots\` | Where the script writes the KMZ files for Max (set by `$kmlFolder` at the top of `FetchDailyRecords.ps1`). |
 
 ## How `FetchDailyRecords.ps1` works
 
@@ -49,7 +54,9 @@ The script can be run on demand or unattended on a schedule (using Windows Task 
    LOCATIONID,LOCATIONNAME,LATITUDE,LONGITUDE
    ```
 
-   Existing files are overwritten on every run, and their timestamp is set to the time of the run.
+   Existing files are overwritten on every run, and their timestamp is set to the time of the run. Each CSV is also copied to `D:\WSI\DigitalMedia\Custom\NavImportedData\`; if that copy fails, the failure is logged and the run continues.
+
+   **Also write one KMZ file per day/type** to `D:\WSI\DigitalMedia\Custom\KML\record-dots\` (created if missing), with the same names (`D1_HIMAX.kmz`, ..., `D7_LOMIN.kmz`). Each KMZ bundles a `doc.kml` (one placemark per matched station, with the ID as the name and the station name and update time in the description) and the dot icon for that record type from `icons\`, so each file is self-contained. Each file is written to a temporary file and then renamed, so Max never sees a half-written file. If the KML folder can't be written to, the CSVs and the rest of the run are unaffected.
 
 6. **Write the missing log.** All unresolved IDs (de-duplicated across all 28 files) are written to `missing_log.txt`, one per line. If nothing is missing, any old log is deleted.
 
@@ -80,6 +87,20 @@ Right-click `FetchDailyRecords.ps1` and select `Run with PowerShell`.
 - Actions tab: Start a program (`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`); arguments: `-ExecutionPolicy Bypass -File "C:\LOCAL\Scripts\daily-records\FetchDailyRecords.ps1"`; start in: `C:\LOCAL\Scripts\daily-records`
 - Settings tab: Allow to be run on demand, stop the task if it runs for longer than 1 hour, force it to stop if a running task does not end when requested
 
+## Getting the KMZ files to the on-air Max computer
+
+The script runs on `wbns-tvdc-2` and writes the 28 KMZs to `D:\WSI\DigitalMedia\Custom\KML\record-dots` on that machine (the folder is created if it doesn't exist). The on-air Max computer is a different machine, so a `file:///D:/...` address would point at *its own* `D:` drive and won't work. Max's KML layer doesn't list files; you type the address of each file and it loads whatever is there.
+
+**Use the network share:** `D:\WSI\DigitalMedia` is shared as `\\WBNS-TVDC-2\DigitalMedia`, so each file is reachable from the on-air Max computer at, for example:
+
+```
+\\WBNS-TVDC-2\DigitalMedia\Custom\KML\record-dots\D2_HIMIN.kmz
+```
+
+Enter that address (with the right file name) in the KML layer's URL field in Max. This has been confirmed to load. The address of each file never changes (`D1_HIMAX.kmz` through `D7_LOMIN.kmz`), so you only enter it once per layer, and the script overwrites the files on every run.
+
+The on-air Max computer's account needs read access to the share. If you ever need `http://`/`https://` addresses instead, the files would have to be served by a web server (for example IIS with the `.kmz` MIME type `application/vnd.google-earth.kmz` added) or cloud storage; that would need a small script change.
+
 ## Updating the layer in Max
 
 **Important!** While this script automatically updates the sites, _you must still manually update the scene in Max._
@@ -97,3 +118,9 @@ Right-click `FetchDailyRecords.ps1` and select `Run with PowerShell`.
 - The script forces TLS 1.2 for the NWS API.
 - NWS API requests identify themselves with a contact address in the `-UserAgent` string in `Learn-Station`; keep this current, as NWS may use it to contact you about heavy use.
 - Because `stations.csv` is appended to automatically, it will grow over time. Names have commas stripped so they don't break the CSV.
+
+## Troubleshooting
+
+- Run the script from an open PowerShell window (not right-click) so the output stays on screen, then read `run_log.txt`.
+- `DOWNLOAD FAILED` lines mean the WPC files couldn't be fetched from that machine (network, proxy or firewall). Nothing is written for a file that fails to download, so the previous CSV/KMZ stays in place.
+- `KMZ FAILED` lines (also in `kml_error.log`) mean the CSV was written but the KMZ couldn't be, e.g. the KML folder isn't writable.
