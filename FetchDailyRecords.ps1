@@ -28,6 +28,24 @@ function Write-RunLog {
     Write-Host $line
     try { Add-Content -Path $runLog -Value $line } catch { }
 }
+# Moves a finished temp file into place, replacing any existing file.
+# (Move-Item -Force can fail with "Cannot create a file when that file already exists" in Windows PowerShell 5.1.)
+function Publish-File {
+    param([string]$Temp, [string]$Destination)
+    if (-not (Test-Path -LiteralPath $Destination)) {
+        [System.IO.File]::Move($Temp, $Destination)
+        return
+    }
+    try {
+        # Atomic swap on NTFS
+        [System.IO.File]::Replace($Temp, $Destination, $null)
+    } catch {
+        # Fall back to overwriting in place, then clean up the temp file
+        [System.IO.File]::Copy($Temp, $Destination, $true)
+        Remove-Item -LiteralPath $Temp -Force -ErrorAction SilentlyContinue
+    }
+}
+
 Write-RunLog "Starting. PowerShell $($PSVersionTable.PSVersion); script dir: $scriptDir"
 Write-RunLog "Stations file exists: $(Test-Path $stationFile); KML folder exists: $(Test-Path $kmlFolder); icons folder exists: $(Test-Path $iconFolder)"
 
@@ -207,7 +225,7 @@ foreach ($day in $days) {
             $navFile = Join-Path $navDataFolder (Split-Path $fileName -Leaf)
             $navTmp  = "$navFile.tmp"
             Copy-Item -Path $fileName -Destination $navTmp -Force -ErrorAction Stop
-            Move-Item -Path $navTmp -Destination $navFile -Force -ErrorAction Stop
+            Publish-File -Temp $navTmp -Destination $navFile
             $navCount++
         } catch {
             Write-RunLog ("CSV COPY FAILED {0}_{1}: {2}" -f $day.ToUpper(), $type.ToUpper(), $_.Exception.Message)
@@ -266,7 +284,7 @@ foreach ($day in $days) {
                 $zip.Dispose()
                 $fs.Dispose()
             }
-            Move-Item -Path $kmzTmp -Destination $kmzFile -Force -ErrorAction Stop
+            Publish-File -Temp $kmzTmp -Destination $kmzFile
             $kmzCount++
 
             # Remove a plain .kml of the same name left by an earlier version, so Max doesn't see duplicates
