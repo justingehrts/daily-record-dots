@@ -16,6 +16,7 @@ The script can be run on demand or unattended on a schedule (using Windows Task 
 | `kml_error.log` | Written by the script only if a KMZ couldn't be created; lists the error for each file. Recreated on every run. |
 | `exports\` | Created by the script. Holds the output CSVs. |
 | `icons\` | The four dot icons (`himax.png`, `himin.png`, `lomax.png`, `lomin.png`) that the script bundles into each KMZ. Keep this folder next to the script. |
+| `D:\WSI\DigitalMedia\Custom\NavImportedData\` | A copy of each CSV is also written here for Max (set by `$navDataFolder` at the top of `FetchDailyRecords.ps1`). |
 | `D:\WSI\DigitalMedia\Custom\KML\` | Where the script writes the KMZ files for Max (set by `$kmlFolder` at the top of `FetchDailyRecords.ps1`). |
 
 ## How `FetchDailyRecords.ps1` works
@@ -53,7 +54,7 @@ The script can be run on demand or unattended on a schedule (using Windows Task 
    LOCATIONID,LOCATIONNAME,LATITUDE,LONGITUDE
    ```
 
-   Existing files are overwritten on every run, and their timestamp is set to the time of the run.
+   Existing files are overwritten on every run, and their timestamp is set to the time of the run. Each CSV is also copied to `D:\WSI\DigitalMedia\Custom\NavImportedData\`; if that copy fails, the failure is logged and the run continues.
 
    **Also write one KMZ file per day/type** to `D:\WSI\DigitalMedia\Custom\KML\`, with the same names (`D1_HIMAX.kmz`, ..., `D7_LOMIN.kmz`). Each KMZ bundles a `doc.kml` (one placemark per matched station, with the ID as the name and the station name and update time in the description) and the dot icon for that record type from `icons\`, so each file is self-contained. Each file is written to a temporary file and then renamed, so Max never sees a half-written file. If the KML folder can't be written to, the CSVs and the rest of the run are unaffected.
 

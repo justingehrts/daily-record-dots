@@ -14,6 +14,7 @@ $missingLog    = Join-Path $scriptDir "missing_log.txt"
 $kmlErrorLog   = Join-Path $scriptDir "kml_error.log"
 $runLog        = Join-Path $scriptDir "run_log.txt"
 $kmlFolder     = "D:\WSI\DigitalMedia\Custom\KML" # Max reads KML/KMZ files from here
+$navDataFolder = "D:\WSI\DigitalMedia\Custom\NavImportedData" # Copy of each CSV is also placed here for Max
 $iconFolder    = Join-Path $scriptDir "icons"          # himax.png, himin.png, lomax.png, lomin.png
 
 # Start each run with fresh logs
@@ -114,6 +115,7 @@ $allMissing = [System.Collections.Generic.HashSet[string]]::new()
 $failedDownloads = 0
 $csvCount = 0
 $kmzCount = 0
+$navCount = 0
 
 foreach ($day in $days) {
     foreach ($type in $types) {
@@ -199,6 +201,18 @@ foreach ($day in $days) {
         (Get-Item $fileName).LastWriteTime = Get-Date
         $csvCount++
 
+        # Also copy the CSV to Max's NavImportedData folder (failure must not stop the run)
+        try {
+            if (-not (Test-Path $navDataFolder)) { New-Item -ItemType Directory -Path $navDataFolder -Force -ErrorAction Stop | Out-Null }
+            $navFile = Join-Path $navDataFolder (Split-Path $fileName -Leaf)
+            $navTmp  = "$navFile.tmp"
+            Copy-Item -Path $fileName -Destination $navTmp -Force -ErrorAction Stop
+            Move-Item -Path $navTmp -Destination $navFile -Force -ErrorAction Stop
+            $navCount++
+        } catch {
+            Write-RunLog ("CSV COPY FAILED {0}_{1}: {2}" -f $day.ToUpper(), $type.ToUpper(), $_.Exception.Message)
+        }
+
         # --- KMZ EXPORT (for Max) ---
         # Failure here (e.g. drive unavailable) must never stop the CSV export or the rest of the run
         try {
@@ -274,4 +288,4 @@ if ($allMissing.Count -gt 0) {
     if (Test-Path $missingLog) { Remove-Item -Path $missingLog -Force }
 }
 
-Write-RunLog "Done. Downloads failed/skipped: $failedDownloads of 28; CSVs written: $csvCount; KMZs written: $kmzCount; missing station IDs: $($allMissing.Count)"
+Write-RunLog "Done. Downloads failed/skipped: $failedDownloads of 28; CSVs written: $csvCount (copied to NavImportedData: $navCount); KMZs written: $kmzCount; missing station IDs: $($allMissing.Count)"
