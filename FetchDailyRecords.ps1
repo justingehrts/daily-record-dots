@@ -13,7 +13,7 @@ $exportFolder  = Join-Path $scriptDir "exports"
 $missingLog    = Join-Path $scriptDir "missing_log.txt"
 $kmlErrorLog   = Join-Path $scriptDir "kml_error.log"
 $runLog        = Join-Path $scriptDir "run_log.txt"
-$kmlFolder     = "D:\WSI\DigitalMedia\Custom\KML" # Max reads KML/KMZ files from here
+$kmlFolder     = "D:\WSI\DigitalMedia\Custom\KML\record-dots" # Max reads KML/KMZ files from here
 $navDataFolder = "D:\WSI\DigitalMedia\Custom\NavImportedData" # Copy of each CSV is also placed here for Max
 $iconFolder    = Join-Path $scriptDir "icons"          # himax.png, himin.png, lomax.png, lomin.png
 

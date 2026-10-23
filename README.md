@@ -17,7 +17,7 @@ The script can be run on demand or unattended on a schedule (using Windows Task 
 | `exports\` | Created by the script. Holds the output CSVs. |
 | `icons\` | The four dot icons (`himax.png`, `himin.png`, `lomax.png`, `lomin.png`) that the script bundles into each KMZ. Keep this folder next to the script. |
 | `D:\WSI\DigitalMedia\Custom\NavImportedData\` | A copy of each CSV is also written here for Max (set by `$navDataFolder` at the top of `FetchDailyRecords.ps1`). |
-| `D:\WSI\DigitalMedia\Custom\KML\` | Where the script writes the KMZ files for Max (set by `$kmlFolder` at the top of `FetchDailyRecords.ps1`). |
+| `D:\WSI\DigitalMedia\Custom\KML\record-dots\` | Where the script writes the KMZ files for Max (set by `$kmlFolder` at the top of `FetchDailyRecords.ps1`). |
 
 ## How `FetchDailyRecords.ps1` works
 
@@ -56,7 +56,7 @@ The script can be run on demand or unattended on a schedule (using Windows Task 
 
    Existing files are overwritten on every run, and their timestamp is set to the time of the run. Each CSV is also copied to `D:\WSI\DigitalMedia\Custom\NavImportedData\`; if that copy fails, the failure is logged and the run continues.
 
-   **Also write one KMZ file per day/type** to `D:\WSI\DigitalMedia\Custom\KML\`, with the same names (`D1_HIMAX.kmz`, ..., `D7_LOMIN.kmz`). Each KMZ bundles a `doc.kml` (one placemark per matched station, with the ID as the name and the station name and update time in the description) and the dot icon for that record type from `icons\`, so each file is self-contained. Each file is written to a temporary file and then renamed, so Max never sees a half-written file. If the KML folder can't be written to, the CSVs and the rest of the run are unaffected.
+   **Also write one KMZ file per day/type** to `D:\WSI\DigitalMedia\Custom\KML\record-dots\` (created if missing), with the same names (`D1_HIMAX.kmz`, ..., `D7_LOMIN.kmz`). Each KMZ bundles a `doc.kml` (one placemark per matched station, with the ID as the name and the station name and update time in the description) and the dot icon for that record type from `icons\`, so each file is self-contained. Each file is written to a temporary file and then renamed, so Max never sees a half-written file. If the KML folder can't be written to, the CSVs and the rest of the run are unaffected.
 
 6. **Write the missing log.** All unresolved IDs (de-duplicated across all 28 files) are written to `missing_log.txt`, one per line. If nothing is missing, any old log is deleted.
 
@@ -89,21 +89,17 @@ Right-click `FetchDailyRecords.ps1` and select `Run with PowerShell`.
 
 ## Getting the KMZ files to the on-air Max computer
 
-The script runs on `wbns-tvdc-2` and writes the KMZs to `D:\WSI\DigitalMedia\Custom\KML` on that machine. The on-air Max computer is a different machine, so a `file:///D:/...` address would point at *its own* `D:` drive and won't work. Max's KML layer doesn't list files; you type the address of each file and it loads whatever is there.
+The script runs on `wbns-tvdc-2` and writes the 28 KMZs to `D:\WSI\DigitalMedia\Custom\KML\record-dots` on that machine (the folder is created if it doesn't exist). The on-air Max computer is a different machine, so a `file:///D:/...` address would point at *its own* `D:` drive and won't work. Max's KML layer doesn't list files; you type the address of each file and it loads whatever is there.
 
-**Try a network share first (no extra software):**
+**Use the network share:** `D:\WSI\DigitalMedia` is shared as `\\WBNS-TVDC-2\DigitalMedia`, so each file is reachable from the on-air Max computer at, for example:
 
-1. On `wbns-tvdc-2`, share the `D:\WSI\DigitalMedia\Custom\KML` folder (for example as `KML`), read-only for the on-air Max computer's account. The script keeps writing to the folder locally.
-2. From the on-air Max computer, confirm it can see the files: `Test-Path \\wbns-tvdc-2\KML\D1_HIMAX.kmz`
-3. In the KML layer's URL field in Max, try these forms in order until one loads:
-   - `\\wbns-tvdc-2\KML\D1_HIMAX.kmz`
-   - `file://wbns-tvdc-2/KML/D1_HIMAX.kmz`
-   - `file:////wbns-tvdc-2/KML/D1_HIMAX.kmz`
-4. Re-run the script and confirm Max picks up the new data.
+```
+\\WBNS-TVDC-2\DigitalMedia\Custom\KML\record-dots\D2_HIMIN.kmz
+```
 
-The address of each file never changes (`D1_HIMAX.kmz` through `D7_LOMIN.kmz`), so you only enter it once per layer.
+Enter that address (with the right file name) in the KML layer's URL field in Max. This has been confirmed to load. The address of each file never changes (`D1_HIMAX.kmz` through `D7_LOMIN.kmz`), so you only enter it once per layer, and the script overwrites the files on every run.
 
-**If Max only accepts `http://` or `https://` addresses**, the files need to be served by a web server, for example IIS on `wbns-tvdc-2` (a site pointing at a folder, plus the MIME type `.kmz` = `application/vnd.google-earth.kmz`, otherwise IIS answers with a 404, and a firewall rule for the port) or cloud storage. This would need a small change to the script to write to that folder; ask for it when you get to that point. IT may need to approve a web server.
+The on-air Max computer's account needs read access to the share. If you ever need `http://`/`https://` addresses instead, the files would have to be served by a web server (for example IIS with the `.kmz` MIME type `application/vnd.google-earth.kmz` added) or cloud storage; that would need a small script change.
 
 ## Updating the layer in Max
 
