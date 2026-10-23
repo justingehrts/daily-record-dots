@@ -87,6 +87,24 @@ Right-click `FetchDailyRecords.ps1` and select `Run with PowerShell`.
 - Actions tab: Start a program (`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`); arguments: `-ExecutionPolicy Bypass -File "C:\LOCAL\Scripts\daily-records\FetchDailyRecords.ps1"`; start in: `C:\LOCAL\Scripts\daily-records`
 - Settings tab: Allow to be run on demand, stop the task if it runs for longer than 1 hour, force it to stop if a running task does not end when requested
 
+## Getting the KMZ files to the on-air Max computer
+
+The script runs on `wbns-tvdc-2` and writes the KMZs to `D:\WSI\DigitalMedia\Custom\KML` on that machine. The on-air Max computer is a different machine, so a `file:///D:/...` address would point at *its own* `D:` drive and won't work. Max's KML layer doesn't list files; you type the address of each file and it loads whatever is there.
+
+**Try a network share first (no extra software):**
+
+1. On `wbns-tvdc-2`, share the `D:\WSI\DigitalMedia\Custom\KML` folder (for example as `KML`), read-only for the on-air Max computer's account. The script keeps writing to the folder locally.
+2. From the on-air Max computer, confirm it can see the files: `Test-Path \\wbns-tvdc-2\KML\D1_HIMAX.kmz`
+3. In the KML layer's URL field in Max, try these forms in order until one loads:
+   - `\\wbns-tvdc-2\KML\D1_HIMAX.kmz`
+   - `file://wbns-tvdc-2/KML/D1_HIMAX.kmz`
+   - `file:////wbns-tvdc-2/KML/D1_HIMAX.kmz`
+4. Re-run the script and confirm Max picks up the new data.
+
+The address of each file never changes (`D1_HIMAX.kmz` through `D7_LOMIN.kmz`), so you only enter it once per layer.
+
+**If Max only accepts `http://` or `https://` addresses**, the files need to be served by a web server, for example IIS on `wbns-tvdc-2` (a site pointing at a folder, plus the MIME type `.kmz` = `application/vnd.google-earth.kmz`, otherwise IIS answers with a 404, and a firewall rule for the port) or cloud storage. This would need a small change to the script to write to that folder; ask for it when you get to that point. IT may need to approve a web server.
+
 ## Updating the layer in Max
 
 **Important!** While this script automatically updates the sites, _you must still manually update the scene in Max._
