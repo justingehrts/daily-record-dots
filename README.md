@@ -45,7 +45,7 @@ The script can be run on demand or unattended on a schedule (using Windows Task 
 4. **Match each ID to a location**, in this order:
    1. Exact match in `stations.csv`.
    2. If the ID is 3 letters, try again with a `K` prefix (e.g. `CMH` → `KCMH`).
-   3. **Auto-learn:** if the ID is non-numeric and at least 3 characters, query the NWS API (`https://api.weather.gov/stations/<id>`, trying `K<id>` first for 3-letter IDs). If the API returns coordinates, the station is used immediately and appended to `stations.csv`, so it is found locally next time.
+   3. **Auto-learn:** if the ID is non-numeric and at least 3 characters, query the NWS API (`https://api.weather.gov/stations/<id>`, trying `K<id>` first for 3-letter IDs). If the API returns coordinates, the station is used immediately and appended to `stations.csv`, so it is found locally next time. If the NWS API has nothing (typical for COOP sites like `TAHC1`), the [Iowa Environmental Mesonet](https://mesonet.agron.iastate.edu/sites/networks.php) station API (`https://mesonet.agron.iastate.edu/api/1/station/<id>.json`) is tried the same way; offline stations and `WFO` office entries are skipped and left as missing, and each Mesonet hit is noted in `run_log.txt`.
    4. Otherwise the ID is recorded as **missing**.
 
 5. **Write one CSV per day/type** to `exports\`, named `<DAY>_<TYPE>.csv` (e.g. `D1_HIMAX.csv`, `D7_LOMIN.csv`). Each file has a header row and one row per matched station:
