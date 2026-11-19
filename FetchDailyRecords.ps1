@@ -122,6 +122,39 @@ function Learn-Station {
             # Continue to next attempt if API fails
         }
     }
+
+    # Fallback: Iowa Environmental Mesonet (covers COOP/other networks the NWS API lacks).
+    # Skips offline stations and WFO office entries; those stay in the missing log for manual review.
+    try {
+        $url = "https://mesonet.agron.iastate.edu/api/1/station/$Code.json"
+        $res = Invoke-RestMethod -Uri $url -UserAgent "WBNS-Weather-Bot (justin.gehrts@10tv.com)" -TimeoutSec 4 -ErrorAction Stop
+        $stn = @($res.data) | Where-Object { $_ -and $_.id -eq $Code } | Select-Object -First 1
+        if ($stn -and $stn.online -and $stn.network -ne 'WFO' -and $null -ne $stn.latitude -and $null -ne $stn.longitude) {
+            $name = ([string]$stn.name).Replace(',', '').Trim()
+            if (-not $name) { $name = $Code }
+            if ($stn.state) { $name = "$name $($stn.state)" }
+            $lat = $stn.latitude
+            $lon = $stn.longitude
+
+            $stationMap[$Code] = @{
+                LOCATIONID   = $Code
+                LOCATIONNAME = $name
+                LATITUDE     = $lat
+                LONGITUDE    = $lon
+            }
+            Add-Content -Path $stationFile -Value "$Code,$name,$lat,$lon"
+            Write-RunLog "Learned $Code from Iowa Mesonet ($($stn.network)): $name"
+
+            return [PSCustomObject]@{
+                LOCATIONID   = $Code
+                LOCATIONNAME = $name
+                LATITUDE     = $lat
+                LONGITUDE    = $lon
+            }
+        }
+    } catch {
+        # Mesonet unreachable or unknown ID: leave as missing
+    }
     return $null
 }
 
