@@ -1,0 +1,148 @@
+name: Build and publish record dots
+
+# Builds the 28 record-dot KMZs (D1_HIMAX.kmz ... D7_LOMIN.kmz) and status.json, then deploys them to GitHub Pages.
+# A Pages deploy replaces the whole site, so anything this run fails to produce is first copied from the live site
+# (tools/carry_over.py). If even that cannot give a complete set, the run stops BEFORE the deploy and the live site is left alone.
+#
+# Started hourly by cron-job.org through workflow_dispatch (see README "cron-job.org setup"). The schedule below is a slow backstop.
+
+on:
+  workflow_dispatch:
+    inputs:
+      simulate:
+        description: 'Test the failure handling (the live site must stay intact and the run must end red)'
+        type: choice
+        default: none
+        options: [none, records-fail]
+  schedule:
+    - cron: '15 9 * * *'     # backstop only; GitHub schedules are unreliable
+  push:
+    branches: [main]
+    paths:
+      - 'FetchDailyRecords.ps1'
+      - 'stations.csv'
+      - 'icons/**'
+      - 'tools/**'
+      - '.github/workflows/record-dots.yml'
+
+permissions:
+  contents: write          # only used to save newly learned stations back to stations.csv
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: github-pages
+    env:
+      SIMULATE: ${{ inputs.simulate || 'none' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check the National Weather Service contact address is set
+        env:
+          NWS_CONTACT: ${{ secrets.NWS_CONTACT || vars.NWS_CONTACT }}
+          FROM_SECRET: ${{ secrets.NWS_CONTACT != '' }}
+        run: |
+          echo "::add-mask::$NWS_CONTACT"
+          if [ -z "$NWS_CONTACT" ]; then
+            echo "::error::Add a repository secret named NWS_CONTACT (Settings > Secrets and variables > Actions > Secrets) with a contact email address. NWS asks automated tools to identify an owner."
+            exit 1
+          fi
+          if [ "$FROM_SECRET" != "true" ]; then
+            echo "::warning::NWS_CONTACT is a variable, so it can appear in public logs. Create it as a secret instead and delete the variable."
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Write config for the script
+        env:
+          NWS_CONTACT: ${{ secrets.NWS_CONTACT || vars.NWS_CONTACT }}
+        run: |
+          mkdir -p site /tmp/navdata
+          jq -n --arg email "$NWS_CONTACT" --arg kml "$PWD/site" \
+            '{station:{name:"RecordDots",contactEmail:$email},recordDots:{kmlFolder:$kml,navDataFolder:"/tmp/navdata"}}' > config.json
+
+      - name: Fetch NOAA lists and build the KMZs
+        id: records_fetch
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          if ($env:SIMULATE -eq 'records-fail') { Write-Host "::error::Simulated failure (test run)"; exit 1 }
+          ./FetchDailyRecords.ps1
+
+      - name: Check the KMZ set and write its status
+        id: records_check
+        continue-on-error: true
+        run: python tools/records_status.py --site site --run-log run_log.txt --missing-log missing_log.txt
+
+      - name: Keep the last published copy of anything that was not rebuilt
+        run: python tools/carry_over.py --site site --base "https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}" --report carry_report.json
+
+      - name: Make sure the site is complete before deploying
+        run: |
+          n=$(ls site/D[1-7]_{HIMAX,LOMAX,HIMIN,LOMIN}.kmz 2>/dev/null | wc -l)
+          if [ "$n" -ne 28 ] || [ ! -f site/status.json ]; then
+            echo "::error::Only $n of 28 KMZs (or no status.json) available, even after restoring from the live site. Not deploying; the live site is untouched."
+            exit 1
+          fi
+
+      - name: Write the index page
+        run: python tools/build_index.py --site site
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deploy_first
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      # GitHub's deploy step sometimes cannot find the bundle it has just stored ("Found 0 artifact(s)"): a timing flake. Retry once.
+      - name: Wait 45 seconds before retrying the deploy
+        if: steps.deploy_first.outcome == 'failure'
+        run: |
+          echo "::warning::The first deploy failed (usually a GitHub timing flake); retrying once."
+          sleep 45
+
+      - name: Deploy to GitHub Pages (retry)
+        if: steps.deploy_first.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+
+      - name: Save newly learned stations
+        if: env.SIMULATE == 'none'
+        run: |
+          if ! git diff --quiet -- stations.csv; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add stations.csv
+            git commit -m "Learn new stations"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push
+          fi
+
+      - name: Turn the run red if anything went wrong
+        run: |
+          # The site is already deployed (with the last good copy of anything that failed). This only makes sure somebody notices.
+          bad=0
+          if [ "${{ steps.records_fetch.outcome }}" != "success" ]; then echo "::error::Download/build step failed."; bad=1; fi
+          if [ "${{ steps.records_check.outcome }}" != "success" ]; then echo "::error::KMZ check step failed."; bad=1; fi
+          carried=$(jq '.carried | length' carry_report.json)
+          if [ "$carried" -gt 0 ]; then echo "::error::$carried file(s) were not rebuilt this run and show the last published copy."; bad=1; fi
+          if [ "$SIMULATE" != "none" ]; then echo "::notice::This was a simulated-failure test ($SIMULATE). A red result here is expected."; fi
+          exit $bad

@@ -4,6 +4,61 @@ Pulls the forecast **record and near-record temperature** lists from the Nationa
 
 The script can be run on demand or unattended on a schedule (using Windows Task Scheduler on Core 2).
 
+## Hosted pipeline (GitHub Actions + Pages)
+
+The KMZs are built and published by GitHub, not by a Windows machine. The workflow `.github/workflows/record-dots.yml` ("Build and publish record dots") runs `FetchDailyRecords.ps1` under PowerShell 7 on a GitHub Linux runner, checks that all 28 files exist, and deploys them to GitHub Pages:
+
+```
+https://justingehrts.github.io/daily-record-dots/D1_HIMAX.kmz   (D1..D7 x HIMAX, LOMAX, HIMIN, LOMIN = 28 files)
+https://justingehrts.github.io/daily-record-dots/status.json
+```
+
+`status.json` looks like `{"generatedUtc": "...", "kmz": 28, "scriptSummary": "...", "missing": ["TAHC1", ...], "missingCount": 1}`. `missing` lists the station IDs that have no location yet (see "Updating the station list" below).
+
+A failed or partial run never replaces the last good site: anything that wasn't rebuilt is copied from the live site first (`tools/carry_over.py`), the run ends red so you hear about it, and if even that can't produce a complete set, the run stops before deploying. The Windows-local engine described further down is the older way of running the same script; a snapshot of it is kept on the `archive/windows-local-engine` branch.
+
+### One-time setup
+1. Settings > Pages > **Source: GitHub Actions**.
+2. Settings > Secrets and variables > Actions > **Secrets** > New repository secret `NWS_CONTACT` = a contact email address. NWS asks automated tools to identify an owner; it is sent in the `User-Agent` of API requests.
+3. Set up the hourly trigger below, or start a run by hand: Actions tab > Build and publish record dots > Run workflow.
+
+### cron-job.org setup (hourly trigger)
+GitHub's own `schedule:` is unreliable, so the workflow only keeps a slow daily backup schedule and a cron-job.org job starts it every hour.
+
+1. **Make a token:** GitHub > your photo > Settings > Developer settings > Personal access tokens > **Fine-grained tokens** > Generate new token. Repository access: *Only select repositories* > `daily-record-dots`. Repository permissions: **Actions: Read and write**, nothing else. Choose the longest expiration and put a calendar reminder a week before it ends; the trigger stops working when it expires. Copy the token (it starts with `github_pat_`; it is shown once). Never commit it or paste it into the repo.
+2. **Create the job** at cron-job.org:
+   - URL: `https://api.github.com/repos/justingehrts/daily-record-dots/actions/workflows/record-dots.yml/dispatches`
+   - Schedule: every hour at minute 20 (any minute works)
+   - Request method: `POST`; request body: `{"ref":"main"}`
+   - Headers:
+
+     | Name | Value |
+     | --- | --- |
+     | `Authorization` | `Bearer github_pat_...your token...` |
+     | `Accept` | `application/vnd.github+json` |
+     | `X-GitHub-Api-Version` | `2022-11-28` |
+     | `Content-Type` | `application/json` |
+
+   - Turn on failure notifications. GitHub answers **HTTP 204** on success; `401` = token wrong or expired; `403`/`404` = the token doesn't cover this repo or the workflow file name is wrong.
+3. Use the **Test run** button once, then check the Actions tab for a run with event `workflow_dispatch`.
+
+### Updating the station list
+Stations the script can't place are listed in `status.json` under `missing` (and in `missing_log.txt` in the workflow's run). The script already tries `stations.csv`, then the NWS API, then the Iowa Mesonet API; whatever is left needs a row added by hand. Newly learned stations are saved back to `stations.csv` automatically.
+
+1. Find the station on the [Iowa Mesonet networks page](https://mesonet.agron.iastate.edu/sites/networks.php): pick the network (for example `CA_COOP`), then the station, and note its name, latitude and longitude. (`https://mesonet.agron.iastate.edu/api/1/station/<ID>.json` shows the same data.)
+2. On GitHub open `stations.csv`, click the pencil (Edit), add one line at the end, and commit to `main`:
+
+   ```
+   TAHC1,Tahoe City CA,39.1677,-120.1429
+   ```
+
+   Format: `ID,name,latitude,longitude`. No commas inside the name, west longitudes are negative.
+3. The commit starts a new build automatically (changes to `stations.csv` trigger the workflow), and the station's dot appears in the next KMZ set.
+
+A station you decide not to track can simply be left alone; it only costs a lookup attempt each run. Offline stations and forecast-office (`WFO`) entries are skipped by the Mesonet fallback on purpose, so they stay in the missing list.
+
+A weekly review of the missing list is logged to Justin's project manager as a to-do when anything is missing.
+
 ## Files
 
 | File | Purpose |

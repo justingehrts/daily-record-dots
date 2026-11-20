@@ -46,8 +46,31 @@ function Publish-File {
     }
 }
 
+# --- OPTIONAL config.json (written by the station configurator page) ---
+# If config.json is not next to this script, the built-in defaults above are used,
+# so a setup that already works keeps working unchanged.
+$nwsUserAgent = "WBNS-Weather-Bot (justin.gehrts@10tv.com)"
+$configFile = Join-Path $scriptDir "config.json"
+$configNote = "No config.json found; using built-in defaults."
+if (Test-Path -LiteralPath $configFile) {
+    # A config file means this is a configured station: never fall back to someone else's contact address.
+    $nwsUserAgent = "Record-Dots-Script"
+    try {
+        $cfg = Get-Content -LiteralPath $configFile -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($cfg.recordDots.kmlFolder)     { $kmlFolder     = [string]$cfg.recordDots.kmlFolder }
+        if ($cfg.recordDots.navDataFolder) { $navDataFolder = [string]$cfg.recordDots.navDataFolder }
+        if ($cfg.station.contactEmail) {
+            $nwsUserAgent = "{0}-Weather-Bot ({1})" -f ([string]$cfg.station.name), ([string]$cfg.station.contactEmail)
+        }
+        $configNote = "Loaded config.json for station '$($cfg.station.name)'."
+    } catch {
+        $configNote = "config.json could not be read ($($_.Exception.Message)); using built-in folders."
+    }
+}
+
 Write-RunLog "Starting. PowerShell $($PSVersionTable.PSVersion); script dir: $scriptDir"
 Write-RunLog "Stations file exists: $(Test-Path $stationFile); KML folder exists: $(Test-Path $kmlFolder); icons folder exists: $(Test-Path $iconFolder)"
+Write-RunLog "$configNote NWS User-Agent: $nwsUserAgent"
 
 # Create exports folder if it doesn't exist
 if (-not (Test-Path $exportFolder)) { New-Item -ItemType Directory -Path $exportFolder | Out-Null }
@@ -91,7 +114,7 @@ function Learn-Station {
     foreach ($id in $attempts) {
         $url = "https://api.weather.gov/stations/$id"
         try {
-            $res = Invoke-RestMethod -Uri $url -UserAgent "WBNS-Weather-Bot (justin.gehrts@10tv.com)" -TimeoutSec 4 -ErrorAction Stop
+            $res = Invoke-RestMethod -Uri $url -UserAgent $nwsUserAgent -TimeoutSec 4 -ErrorAction Stop
             if ($res.geometry.coordinates) {
                 $lon  = $res.geometry.coordinates[0]
                 $lat  = $res.geometry.coordinates[1]
@@ -127,7 +150,7 @@ function Learn-Station {
     # Skips offline stations and WFO office entries; those stay in the missing log for manual review.
     try {
         $url = "https://mesonet.agron.iastate.edu/api/1/station/$Code.json"
-        $res = Invoke-RestMethod -Uri $url -UserAgent "WBNS-Weather-Bot (justin.gehrts@10tv.com)" -TimeoutSec 4 -ErrorAction Stop
+        $res = Invoke-RestMethod -Uri $url -UserAgent $nwsUserAgent -TimeoutSec 4 -ErrorAction Stop
         $stn = @($res.data) | Where-Object { $_ -and $_.id -eq $Code } | Select-Object -First 1
         if ($stn -and $stn.online -and $stn.network -ne 'WFO' -and $null -ne $stn.latitude -and $null -ne $stn.longitude) {
             $name = ([string]$stn.name).Replace(',', '').Trim()
